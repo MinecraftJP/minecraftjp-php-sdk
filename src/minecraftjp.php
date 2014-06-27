@@ -8,8 +8,7 @@
 class MinecraftJP {
     const VERSION = '1.0.0';
     protected static $URL_TABLE = array(
-        //'oauth' => 'https://minecraft.jp/oauth/',
-        'oauth' => 'http://servers.dev.minecraft.jp/oauth/',
+        'oauth' => 'https://minecraft.jp/oauth/',
         'api' => 'https://api.minecraft.jp/',
     );
 

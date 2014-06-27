@@ -2,8 +2,8 @@
 require('../src/minecraftjp.php');
 
 $minecraftjp = new MinecraftJP(array(
-    'clientId' => 'd95119dcd37b33ccb7c8',
-    'clientSecret' => 'd8e552e9c35152c2771eaaa271e7acaa5603b503',
+    'clientId' => 'YOUR_CLIENT_ID',
+    'clientSecret' => 'YOUR_CLIENT_SECRET',
 ));
 
 if (isset($_GET['action']) && $_GET['action'] == 'logout') {
