@@ -1,0 +1,22 @@
+{
+    "name": "minecraftjp-php-sdk",
+    "description": "minecraft.jp PHP SDK",
+    "keywords": ["minecraft", "openid connect"],
+    "type": "library",
+    "homepage": "https://minecraft.jp/developer/",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Japan Minecraft Network",
+            "homepage": "https://minecraft.jp"
+        }
+    ],
+    "require": {
+        "php": ">=5.2.0"
+    },
+    "autoload": {
+        "classmap": [
+            "src"
+        ]
+    }
+}
