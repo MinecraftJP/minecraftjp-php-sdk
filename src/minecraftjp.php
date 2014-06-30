@@ -273,8 +273,7 @@ class MinecraftJP {
             throw new Exception('No such public key.');
         }
 
-        $result = $this->sendRequest('GET', 'oauth', 'jwks');
-
+        $result = $this->sendRequest('GET', $this->getUrl('oauth', 'jwks'));
         if ($result && $result = json_decode($result, true)) {
             $len = count($result['keys']);
             for ($i = 0; $i < $len; $i++) {
@@ -287,7 +286,7 @@ class MinecraftJP {
                 $data = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A' . 'MIIBCgKCAQEA' . $key['n'] . 'ID' . $key['e'];
                 $data = "-----BEGIN PUBLIC KEY----- \n" . wordwrap($data, 64, "\n", true) . "\n-----END PUBLIC KEY----- \n";
 
-                $publicKey = openssl_get_publickey($data);
+                $publicKey = openssl_pkey_get_public($data);
                 if (!$publicKey) throw new Exception('Unable to fetch public key.');
                 return $publicKey;
             }
