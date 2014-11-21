@@ -459,7 +459,7 @@ class PHPSessionStorage implements SessionStorageInterafce {
      * @return mixed
      */
     public function read($key) {
-        return $_SESSION[$this->prefix . $key];
+        return isset($_SESSION[$this->prefix . $key]) ? $_SESSION[$this->prefix . $key] : null;
     }
 
     /**
