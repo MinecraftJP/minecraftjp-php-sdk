@@ -101,7 +101,11 @@ class MinecraftJP {
         }
 
         // Generate nonce
-        $nonce = sha1(openssl_random_pseudo_bytes(24));
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $nonce = sha1(openssl_random_pseudo_bytes(24));
+        } else {
+            $nonce = sha1(uniqid(mt_rand(), true));
+        }
         $this->sessionStorage->write('nonce', $nonce);
 
         return $this->getUrl('oauth', 'authorize', array(
