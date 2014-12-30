@@ -8,7 +8,7 @@
 class MinecraftJP {
     const VERSION = '1.1.0';
     protected static $URL_TABLE = array(
-        'oauth' => 'https://minecraft.jp/oauth/',
+        'oauth' => 'http://servers.dev.minecraft.jp/oauth/',//'https://minecraft.jp/oauth/',
         'api-1.0' => 'https://api.minecraft.jp/1.0/',
     );
 
@@ -141,6 +141,7 @@ class MinecraftJP {
      */
     public function logout() {
         $this->sessionStorage->remove('access_token');
+        $this->sessionStorage->remove('refresh_token');
         $this->sessionStorage->remove('user');
     }
 
@@ -161,6 +162,7 @@ class MinecraftJP {
                 if ($error == 'invalid_token' && $options['refresh_token']) {
                     $this->refreshToken();
                     $options['refresh_token'] = false;
+                    $headers['Authorization'] = 'Bearer ' . $this->getAccessToken();
                     return $this->request($method, $url, $data, $headers, $options);
                 }
             }
