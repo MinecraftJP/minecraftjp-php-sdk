@@ -6,10 +6,10 @@
  * @license MIT License
  */
 class MinecraftJP {
-    const VERSION = '1.0.0';
+    const VERSION = '1.1.0';
     protected static $URL_TABLE = array(
         'oauth' => 'https://minecraft.jp/oauth/',
-        'api' => 'https://api.minecraft.jp/',
+        'api-1.0' => 'https://api.minecraft.jp/1.0/',
     );
 
     /**
@@ -35,6 +35,12 @@ class MinecraftJP {
      * @var string
      */
     protected $accessToken;
+
+    /**
+     * Refresh token
+     * @var string
+     */
+    protected $refreshToken;
 
     /**
      * User object
@@ -86,6 +92,19 @@ class MinecraftJP {
     }
 
     /**
+     * Get Refresh token.
+     *
+     * @return mixed
+     */
+    public function getRefreshToken() {
+        if (empty($this->refreshToken)) {
+            $this->refreshToken = $this->sessionStorage->read('refresh_token');
+            return $this->refreshToken;
+        }
+        return $this->refreshToken;
+    }
+
+    /**
      * Get login url for redirect.
      *
      * @param array $options
@@ -125,6 +144,30 @@ class MinecraftJP {
         $this->sessionStorage->remove('user');
     }
 
+    public function request($method, $url, $data = array(), $headers = array(), $options = array()) {
+        $options = array_merge(array(
+            'refresh_token' => true,
+        ), $options);
+
+        $headers = array_merge(array(
+            'Authorization' => 'Bearer ' . $this->getAccessToken(),
+        ), $headers);
+
+        $res = $this->sendRequest($method, $url, $data, $headers);
+        if ($res->getStatusCode() == 401 && preg_match('#^Bearer\s(.*)$#i', $res->getHeader('WWW-Authenticate'), $match)) {
+            if (preg_match('#error="(.*?)"#', $match[1], $match)) {
+                $error = $match[1];
+                // trying refresh
+                if ($error == 'invalid_token' && $options['refresh_token']) {
+                    $this->refreshToken();
+                    $options['refresh_token'] = false;
+                    return $this->request($method, $url, $data, $headers, $options);
+                }
+            }
+        }
+        return $res;
+    }
+
     /**
      * Exchange code to access_token
      */
@@ -133,6 +176,10 @@ class MinecraftJP {
         if ($result && !empty($result['access_token'])) {
             $this->accessToken = $result['access_token'];
             $this->sessionStorage->write('access_token', $result['access_token']);
+            if (!empty($result['refresh_token'])) {
+                $this->refreshToken = $result['refresh_token'];
+                $this->sessionStorage->write('refresh_token', $result['refresh_token']);
+            }
             if (!empty($result['id_token'])) {
                 $this->validateIdToken($result['id_token']);
 
@@ -145,14 +192,42 @@ class MinecraftJP {
     }
 
     /**
+     * Refresh token
+     */
+    public function refreshToken() {
+        $refreshToken = $this->getRefreshToken();
+        if (empty($refreshToken)) {
+            throw new InvalidTokenException('refresh token not available.');
+        }
+        $res = $this->sendRequest('POST', $this->getUrl('oauth', 'token'), array(
+            'refresh_token' => $refreshToken,
+            'client_id' => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
+            'grant_type' => 'refresh_token',
+        ));
+        $result = $res->getBody();
+        if ($result && $result = json_decode($result, true)) {
+            if (!empty($result['error'])) {
+                throw new Exception($result['error_description']);
+            } else if (!empty($result['access_token'])) {
+                $this->accessToken = $result['access_token'];
+                $this->sessionStorage->write('access_token', $result['access_token']);
+                return true;
+            }
+        }
+        throw new Exception('failed to refreshing token.');
+    }
+
+    /**
      * Request User Info
      *
      * @return mixed
      */
     protected  function requestUserInfo() {
-        $result = $this->sendRequest('GET', $this->getUrl('oauth', 'userinfo'), array(), array(
+        $res = $this->sendRequest('GET', $this->getUrl('oauth', 'userinfo'), array(), array(
             'Authorization' => 'Bearer ' . $this->sessionStorage->read('access_token'),
         ));
+        $result = $res->getBody();
 
         return json_decode($result, true);
     }
@@ -163,15 +238,16 @@ class MinecraftJP {
      * @return mixed|null
      * @throws Exception
      */
-    protected  function requestAccessToken() {
+    protected function requestAccessToken() {
         if (!empty($_REQUEST['code'])) {
-            $result = $this->sendRequest('POST', $this->getUrl('oauth', 'token'), array(
+            $res = $this->sendRequest('POST', $this->getUrl('oauth', 'token'), array(
                 'code' => $_REQUEST['code'],
                 'client_id' => $this->getClientId(),
                 'client_secret' => $this->getClientSecret(),
                 'grant_type' => 'authorization_code',
                 'redirect_uri' => $this->getCurrentUrl(),
             ));
+            $result = $res->getBody();
             if ($result && $result = json_decode($result, true)) {
                 if (!empty($result['error'])) {
                     throw new Exception($result['error_description']);
@@ -191,7 +267,7 @@ class MinecraftJP {
      * @param array $params
      * @return string
      */
-    protected function getUrl($type, $path, $params = array()) {
+    public function getUrl($type, $path, $params = array()) {
         $url = self::$URL_TABLE[$type] . $path;
         if (!empty($params)) {
             $url .= '?' . http_build_query($params);
@@ -230,7 +306,8 @@ class MinecraftJP {
         }
         $context = stream_context_create($contextOptions);
 
-        return file_get_contents($url, false, $context);
+        $body = file_get_contents($url, false, $context);
+        return new HttpResponse($http_response_header, $body);
     }
 
     /**
@@ -412,9 +489,64 @@ class MinecraftJP {
     }
 }
 
+class InvalidTokenException extends Exception {
+    function __construct($message, $code = 0, Exception $previous = null) {
+        parent::__construct($message, $code, $previous);
+    }
+}
+
 class InvalidIdTokenException extends Exception {
     function __construct($message, $code = 0, Exception $previous = null) {
         parent::__construct($message, $code, $previous);
+    }
+}
+
+class HttpResponse {
+    private $version;
+    private $statusCode;
+    private $reasonPhrase;
+    private $headers = array();
+    private $body;
+
+    public function __construct($headers, $body) {
+        $parts = explode(' ', $headers[0]);
+        $this->version = str_replace('HTTP/', '', $parts[0]);
+        $this->statusCode = intval($parts[1]);
+        $this->reasonPhrase = $parts[2];
+        for ($i = 1; $i < count($headers); $i++) {
+            $parts = explode(': ', $headers[$i], 2);
+            $this->headers[strtolower($parts[0])] = $parts[1];
+        }
+        $this->body = $body;
+    }
+
+    public function getVersion() {
+        return $this->version;
+    }
+
+    public function getStatusCode() {
+        return $this->statusCode;
+    }
+
+    public function getReasonPhrase() {
+        return $this->reasonPhrase;
+    }
+
+    public function getHeader($key = null) {
+        if (is_null($key)) {
+            return $this->headers;
+        } else {
+            $key = strtolower($key);
+            return isset($this->headers[$key]) ? $this->headers[$key] : null;
+        }
+    }
+
+    public function isOk() {
+        return in_array($this->statusCode, array(200, 201, 202, 203, 204, 205, 206));
+    }
+
+    public function getBody() {
+        return $this->body;
     }
 }
 
