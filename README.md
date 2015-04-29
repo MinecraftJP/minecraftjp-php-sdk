@@ -3,7 +3,7 @@ minecraft.jp PHP SDK
 Usage
 -----
 ```php
-require('minecraftjp-php-sdk/src/minecraftjp.php');
+require('minecraftjp-php-sdk/src/MinecraftJP.php');
 
 $minecraftjp = new MinecraftJP(array(
     'clientId' => 'YOUR_CLIENT_ID',

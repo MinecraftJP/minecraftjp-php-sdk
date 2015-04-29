@@ -347,7 +347,7 @@ class MinecraftJP {
      * @throws Exception
      */
     protected function getPublicKey($kid) {
-        $publicKeyFile = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'minecraftjp.crt';
+        $publicKeyFile = dirname(__FILE__) . DIRECTORY_SEPARATOR . 'MinecraftJP.crt';
         if (file_exists($publicKeyFile)) {
             return openssl_pkey_get_public('file://' . $publicKeyFile);
         }
