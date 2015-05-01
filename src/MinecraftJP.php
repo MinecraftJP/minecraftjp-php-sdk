@@ -6,7 +6,7 @@
  * @license MIT License
  */
 class MinecraftJP {
-    const VERSION = '1.1.0';
+    const VERSION = '1.1.1';
     protected static $URL_TABLE = array(
         'oauth' => 'https://minecraft.jp/oauth/',
         'api-1.0' => 'https://api.minecraft.jp/1.0/',
@@ -23,6 +23,12 @@ class MinecraftJP {
      * @var string
      */
     protected $clientSecret;
+
+    /**
+     * Redirect URI
+     * @var string
+     */
+    protected $redirectUri;
 
     /**
      * Session storage
@@ -51,6 +57,7 @@ class MinecraftJP {
     public function __construct($config) {
         $this->setClientId($config['clientId']);
         $this->setClientSecret($config['clientSecret']);
+        $this->setRedirectUri($config['redirectUri']);
 
         if (!empty($config['sessionStorage']) && $config['sessionStorage'] instanceof SessionStorageInterafce) {
             $this->sessionStorage = $config['sessionStorage'];
@@ -131,7 +138,7 @@ class MinecraftJP {
             'client_id' => $this->getClientId(),
             'response_type' => 'code',
             'scope' => $options['scope'],
-            'redirect_uri' => isset($options['redirect_uri']) ? $options['redirect_uri'] : $this->getCurrentUrl(),
+            'redirect_uri' => isset($options['redirect_uri']) ? $options['redirect_uri'] : $this->redirectUri,
             'nonce' => $nonce,
         ));
     }
@@ -241,13 +248,14 @@ class MinecraftJP {
      * @throws Exception
      */
     protected function requestAccessToken() {
-        if (!empty($_REQUEST['code'])) {
+        $code = $this->getRequestVar('code');
+        if (!empty($code)) {
             $res = $this->sendRequest('POST', $this->getUrl('oauth', 'token'), array(
-                'code' => $_REQUEST['code'],
+                'code' => $code,
                 'client_id' => $this->getClientId(),
                 'client_secret' => $this->getClientSecret(),
                 'grant_type' => 'authorization_code',
-                'redirect_uri' => $this->getCurrentUrl(),
+                'redirect_uri' => $this->redirectUri,
             ));
             $result = $res->getBody();
             if ($result && $result = json_decode($result, true)) {
@@ -318,20 +326,22 @@ class MinecraftJP {
      * @return string
      */
     protected function getCurrentUrl() {
-        if ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+        $isHttps = $this->getServerVar('HTTPS');
+        $forwardedProto = $this->getServerVar('HTTP_X_FORWARDED_PROTO');
+        if ($isHttps == 'on' || $forwardedProto === 'https') {
             $schema = 'https://';
         } else {
             $schema = 'http://';
         }
 
-        $host = $_SERVER['HTTP_HOST'];
+        $host = $this->getServerVar('HOST');
 
         if (preg_match('#:(\d+)$#', $host, $match)) {
             $port = ':' . $match[1];
         } else {
             $port = '';
         }
-        $urls = parse_url($_SERVER['REQUEST_URI']);
+        $urls = parse_url($this->getServerVar('REQUEST_URI'));
 
         $path = $urls['path'];
         $query = '';
@@ -456,6 +466,22 @@ class MinecraftJP {
         return base64_decode($base64);
     }
 
+    protected function getRequestVar($name) {
+        if (function_exists('request_var')) {
+            return request_var($name, '');
+        } else {
+            return $_REQUEST[$name];
+        }
+    }
+
+    protected function getServerVar($name) {
+        if (function_exists('request_var')) {
+            return request_var($name, '');
+        } else {
+            return $_SERVER[$name];
+        }
+    }
+
     /**
      * @param string $clientId
      */
@@ -488,6 +514,23 @@ class MinecraftJP {
      */
     public function getClientSecret() {
         return $this->clientSecret;
+    }
+
+    /**
+     * @param $redirectUri
+     */
+    public function setRedirectUri($redirectUri) {
+        if (empty($redirectUri)) {
+            $redirectUri = $this->getCurrentUrl();
+        }
+        $this->redirectUri = $redirectUri;
+    }
+
+    /**
+     * @return string
+     */
+    public function getRedirectUri() {
+        return $this->redirectUri;
     }
 }
 
