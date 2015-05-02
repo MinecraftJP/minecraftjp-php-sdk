@@ -6,7 +6,7 @@
  * @license MIT License
  */
 class MinecraftJP {
-    const VERSION = '1.1.1';
+    const VERSION = '1.1.2';
     protected static $URL_TABLE = array(
         'oauth' => 'https://minecraft.jp/oauth/',
         'api-1.0' => 'https://api.minecraft.jp/1.0/',
@@ -334,7 +334,7 @@ class MinecraftJP {
             $schema = 'http://';
         }
 
-        $host = $this->getServerVar('HOST');
+        $host = $this->getServerVar('HTTP_HOST');
 
         if (preg_match('#:(\d+)$#', $host, $match)) {
             $port = ':' . $match[1];
