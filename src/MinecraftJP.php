@@ -6,10 +6,11 @@
  * @license MIT License
  */
 class MinecraftJP {
-    const VERSION = '1.1.2';
+    const VERSION = '1.1.3';
     protected static $URL_TABLE = array(
         'oauth' => 'https://minecraft.jp/oauth/',
-        'api-1.0' => 'https://api.minecraft.jp/1.0/',
+        'api-v1' => 'https://api.minecraft.jp/v1/',
+        'pvp-v1' => 'https://pvp-api.minecraft.jp/v1/'
     );
 
     /**
@@ -55,9 +56,9 @@ class MinecraftJP {
     protected $user;
 
     public function __construct($config) {
-        $this->setClientId($config['clientId']);
-        $this->setClientSecret($config['clientSecret']);
-        $this->setRedirectUri($config['redirectUri']);
+        $this->setClientId(isset($config['clientId']) ? $config['clientId'] : null);
+        $this->setClientSecret(isset($config['clientSecret']) ? $config['clientSecret'] : null);
+        $this->setRedirectUri(isset($config['redirectUri']) ? $config['redirectUri'] : null);
 
         if (!empty($config['sessionStorage']) && $config['sessionStorage'] instanceof SessionStorageInterafce) {
             $this->sessionStorage = $config['sessionStorage'];
@@ -88,8 +89,12 @@ class MinecraftJP {
      * @return mixed
      */
     public function getAccessToken() {
-        $this->accessToken = $this->sessionStorage->read('access_token');
         if (!empty($this->accessToken)) {
+            return $this->accessToken;
+        }
+        $accessToken = $this->sessionStorage->read('access_token');
+        if (!empty($accessToken)) {
+            $this->accessToken = $accssToken;
             return $this->accessToken;
         }
 
@@ -109,6 +114,40 @@ class MinecraftJP {
             return $this->refreshToken;
         }
         return $this->refreshToken;
+    }
+
+    /**
+     * Request Client Credentials token
+     */
+    public function requestClientCredentials($options = array()) {
+        $options = array_merge(array(
+            'scope' => '',
+        ), $options);
+
+        $res = $this->sendRequest('POST', $this->getUrl('oauth', 'token'), array(
+            'client_id' => $this->getClientId(),
+            'client_secret' => $this->getClientSecret(),
+            'grant_type' => 'client_credentials',
+            'scope' => $options['scope'],
+        ));
+        $result = $res->getBody();
+
+        $token = null;
+        if ($result && $result = json_decode($result, true)) {
+            if (!empty($result['error'])) {
+                throw new Exception($result['error_description']);
+            }
+
+            if (!empty($result['access_token'])) {
+                $this->accessToken = $token = $result['access_token'];
+            }
+        }
+
+        if (empty($token)) {
+            throw new InvalidTokenException('token not available.');
+        }
+
+        return $token;
     }
 
     /**
@@ -478,7 +517,7 @@ class MinecraftJP {
         if (function_exists('request_var')) {
             return request_var($name, '');
         } else {
-            return $_SERVER[$name];
+            return isset($_SERVER[$name]) ? $_SERVER[$name] : null;
         }
     }
 
